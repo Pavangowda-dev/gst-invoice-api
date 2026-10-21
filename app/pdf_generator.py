@@ -2,27 +2,42 @@ from io import BytesIO
 from xml.sax.saxutils import escape
 
 from reportlab.lib import colors
-from reportlab.lib.enums import TA_CENTER, TA_RIGHT
+from reportlab.lib.enums import TA_CENTER
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import mm
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 from app.formatting import amount_in_words, format_inr
-from app.schemas import CalculatedInvoice, Party
+from app.schemas import BankDetails, CalculatedInvoice, Party
 from app.states import state_name
 
 GREY = colors.HexColor("#f0f0f0")
 LINE = colors.HexColor("#999999")
 
+PAGE_WIDTH = 186  # mm of usable width on A4 with 12mm margins
+
+# widths of the item table columns in mm, the description takes whatever is left
+COLUMN_WIDTHS = {
+    "#": 6,
+    "HSN/SAC": 15,
+    "Qty": 15,
+    "Rate": 17,
+    "Discount": 17,
+    "Taxable": 17,
+    "GST": 10,
+    "CGST": 17,
+    "SGST": 17,
+    "IGST": 17,
+    "Total": 19,
+}
+
 normal = ParagraphStyle("normal", fontName="Helvetica", fontSize=9, leading=12)
 small = ParagraphStyle("small", parent=normal, fontSize=8, leading=10)
-bold = ParagraphStyle("bold", parent=normal, fontName="Helvetica-Bold")
 title = ParagraphStyle(
     "title", parent=normal, fontName="Helvetica-Bold", fontSize=16, leading=20,
     alignment=TA_CENTER,
 )
-right = ParagraphStyle("right", parent=normal, alignment=TA_RIGHT)
 
 
 def clean(text):
@@ -87,44 +102,54 @@ def build_parties(invoice: CalculatedInvoice):
 
 def build_items_table(invoice: CalculatedInvoice):
     intra_state = invoice.tax_type == "intra_state"
+    has_discount = any(item.discount > 0 for item in invoice.items)
 
-    if intra_state:
-        header = ["#", "Description", "HSN/SAC", "Qty", "Rate", "Taxable", "GST", "CGST", "SGST", "Total"]
-        widths = [6, 36, 16, 14, 20, 22, 11, 19, 19, 23]
-    else:
-        header = ["#", "Description", "HSN/SAC", "Qty", "Rate", "Taxable", "GST", "IGST", "Total"]
-        widths = [6, 46, 18, 16, 22, 26, 12, 20, 20]
+    # decide which columns this invoice needs
+    columns = ["#", "Description", "HSN/SAC", "Qty", "Rate"]
+    if has_discount:
+        columns.append("Discount")
+    columns += ["Taxable", "GST"]
+    columns += ["CGST", "SGST"] if intra_state else ["IGST"]
+    columns.append("Total")
 
-    rows = [header]
+    fixed = sum(COLUMN_WIDTHS[name] for name in columns if name != "Description")
+    widths = [
+        (PAGE_WIDTH - fixed if name == "Description" else COLUMN_WIDTHS[name]) * mm
+        for name in columns
+    ]
+
+    rows = [columns]
     for number, item in enumerate(invoice.items, start=1):
-        row = [
-            str(number),
-            Paragraph(clean(item.description), small),
-            item.hsn_sac,
-            f"{plain_number(item.quantity)} {item.unit}",
-            format_inr(item.unit_price),
-            format_inr(item.taxable_value),
-            f"{plain_number(item.gst_rate)}%",
-        ]
-        if intra_state:
-            row += [format_inr(item.cgst), format_inr(item.sgst)]
-        else:
-            row += [format_inr(item.igst)]
-        row.append(format_inr(item.total))
-        rows.append(row)
+        cells = {
+            "#": str(number),
+            "Description": Paragraph(clean(item.description), small),
+            "HSN/SAC": item.hsn_sac,
+            "Qty": f"{plain_number(item.quantity)} {item.unit}",
+            "Rate": format_inr(item.unit_price),
+            "Discount": format_inr(item.discount),
+            "Taxable": format_inr(item.taxable_value),
+            "GST": f"{plain_number(item.gst_rate)}%",
+            "CGST": format_inr(item.cgst),
+            "SGST": format_inr(item.sgst),
+            "IGST": format_inr(item.igst),
+            "Total": format_inr(item.total),
+        }
+        rows.append([cells[name] for name in columns])
 
-    table = Table(rows, colWidths=[w * mm for w in widths], repeatRows=1)
+    table = Table(rows, colWidths=widths, repeatRows=1)
 
     # numbers sit on the right, text on the left
-    first_number_column = 4
+    first_number_column = columns.index("Rate")
     table.setStyle(
         TableStyle(
             [
                 ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                ("FONTSIZE", (0, 0), (-1, -1), 8),
+                ("FONTSIZE", (0, 0), (-1, -1), 7),
                 ("BACKGROUND", (0, 0), (-1, 0), GREY),
                 ("GRID", (0, 0), (-1, -1), 0.5, LINE),
                 ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 3),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 3),
                 ("ALIGN", (first_number_column, 0), (-1, -1), "RIGHT"),
             ]
         )
@@ -134,7 +159,12 @@ def build_items_table(invoice: CalculatedInvoice):
 
 def build_totals(invoice: CalculatedInvoice):
     totals = invoice.totals
-    rows = [["Taxable value", format_inr(totals.taxable_value)]]
+    rows = []
+
+    if totals.discount > 0:
+        rows.append(["Total discount", format_inr(totals.discount)])
+
+    rows.append(["Taxable value", format_inr(totals.taxable_value)])
 
     if invoice.tax_type == "intra_state":
         rows.append(["CGST", format_inr(totals.cgst)])
@@ -157,6 +187,30 @@ def build_totals(invoice: CalculatedInvoice):
                 ("BACKGROUND", (0, -1), (-1, -1), GREY),
                 ("LINEABOVE", (0, -1), (-1, -1), 0.5, LINE),
                 ("BOX", (0, 0), (-1, -1), 0.5, LINE),
+            ]
+        )
+    )
+    return table
+
+
+def build_bank_details(bank: BankDetails):
+    lines = [
+        Paragraph("<b>Bank details</b>", small),
+        Paragraph(f"Account name: {clean(bank.account_name)}", normal),
+        Paragraph(f"Bank: {clean(bank.bank_name)}", normal),
+        Paragraph(f"Account number: {bank.account_number}", normal),
+        Paragraph(f"IFSC: {bank.ifsc}", normal),
+    ]
+    if bank.upi_id:
+        lines.append(Paragraph(f"UPI ID: {clean(bank.upi_id)}", normal))
+
+    table = Table([[lines]], colWidths=[93 * mm], hAlign="LEFT")
+    table.setStyle(
+        TableStyle(
+            [
+                ("BOX", (0, 0), (-1, -1), 0.5, LINE),
+                ("TOPPADDING", (0, 0), (-1, -1), 6),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
             ]
         )
     )
@@ -192,8 +246,12 @@ def generate_pdf(invoice: CalculatedInvoice):
         ),
     ]
 
+    if invoice.bank_details:
+        story.append(Spacer(1, 5 * mm))
+        story.append(build_bank_details(invoice.bank_details))
+
     if invoice.notes:
-        story.append(Spacer(1, 3 * mm))
+        story.append(Spacer(1, 4 * mm))
         story.append(Paragraph(f"<b>Notes:</b> {clean(invoice.notes)}", normal))
 
     story.append(Spacer(1, 10 * mm))

@@ -72,3 +72,45 @@ def test_rounding_to_paisa_and_rupee():
     assert result.totals.sgst == Decimal("9.00")
     assert result.totals.grand_total == Decimal("118.00")
     assert result.totals.round_off == Decimal("0.01")
+
+
+def test_discount_reduces_the_taxable_value():
+    items = [
+        {
+            "description": "Design work",
+            "hsn_sac": "998314",
+            "quantity": 1,
+            "unit_price": 10000,
+            "gst_rate": 18,
+            "discount_percent": 10,
+        }
+    ]
+    result = run(items=items)
+    assert result.totals.discount == Decimal("1000.00")
+    assert result.totals.taxable_value == Decimal("9000.00")
+    assert result.totals.igst == Decimal("1620.00")
+    assert result.totals.grand_total == Decimal("10620.00")
+
+
+def test_discount_with_rounding():
+    items = [
+        {
+            "description": "Odd priced item",
+            "hsn_sac": "998314",
+            "quantity": 3,
+            "unit_price": "33.33",
+            "gst_rate": 18,
+            "discount_percent": 10,
+        }
+    ]
+    result = run(items=items, buyer_state_code="29")
+    assert result.totals.discount == Decimal("10.00")
+    assert result.totals.taxable_value == Decimal("89.99")
+    assert result.totals.cgst == Decimal("8.10")
+    assert result.totals.grand_total == Decimal("106.00")
+    assert result.totals.round_off == Decimal("-0.19")
+
+
+def test_no_discount_by_default():
+    result = run()
+    assert result.totals.discount == Decimal("0.00")

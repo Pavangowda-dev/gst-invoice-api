@@ -1,6 +1,7 @@
 import re
 
 from fastapi import FastAPI, Response
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.calculator import calculate_invoice
 from app.pdf_generator import generate_pdf
@@ -10,6 +11,14 @@ app = FastAPI(
     title="GST Invoice API",
     description="Open-source API to generate GST-compliant invoices for Indian businesses.",
     version="0.1.0",
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=["Content-Disposition"],
 )
 
 

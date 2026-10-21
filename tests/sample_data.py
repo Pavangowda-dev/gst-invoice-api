@@ -1,9 +1,22 @@
+SAMPLE_GSTIN = "29ABCDE1234F1ZW"
+BUYER_GSTIN = "33AAACR1234A1ZA"
+
+SAMPLE_BANK = {
+    "account_name": "Pavan Dev Studio",
+    "bank_name": "HDFC Bank",
+    "account_number": "50100123456789",
+    "ifsc": "HDFC0001234",
+    "upi_id": "pavan@okhdfcbank",
+}
+
+
 def sample_invoice(
-    seller_gstin="29ABCDE1234F1Z5",
+    seller_gstin=SAMPLE_GSTIN,
     gst_rate=18,
     items=None,
     buyer_state_code="33",
     place_of_supply=None,
+    bank_details=None,
 ):
     if items is None:
         items = [
@@ -42,5 +55,8 @@ def sample_invoice(
 
     if place_of_supply:
         invoice["place_of_supply"] = place_of_supply
+
+    if bank_details:
+        invoice["bank_details"] = bank_details
 
     return invoice

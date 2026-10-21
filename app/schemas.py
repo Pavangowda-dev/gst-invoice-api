@@ -1,9 +1,10 @@
-import re
 from datetime import date
 from decimal import Decimal
 from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
+
+from app.gstin import has_valid_checksum, has_valid_format
 
 # GST rates currently in use. Update this when the GST Council changes rates.
 ALLOWED_GST_RATES = {
@@ -14,9 +15,6 @@ ALLOWED_GST_RATES = {
     Decimal("18"),
     Decimal("40"),
 }
-
-# 2 digit state code + 10 char PAN + entity number + Z + check character
-GSTIN_PATTERN = re.compile(r"^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$")
 
 
 class Address(BaseModel):
@@ -38,8 +36,10 @@ class Party(BaseModel):
         if value is None:
             return None
         value = str(value).strip().upper()
-        if not GSTIN_PATTERN.match(value):
+        if not has_valid_format(value):
             raise ValueError("GSTIN format is not valid")
+        if not has_valid_checksum(value):
+            raise ValueError("GSTIN check digit does not match, please check for a typo")
         return value
 
 
@@ -50,6 +50,7 @@ class LineItem(BaseModel):
     unit: str = "NOS"
     unit_price: Decimal = Field(ge=0)
     gst_rate: Decimal
+    discount_percent: Decimal = Field(default=Decimal("0"), ge=0, le=100)
 
     @field_validator("gst_rate")
     @classmethod
@@ -60,6 +61,19 @@ class LineItem(BaseModel):
         return value
 
 
+class BankDetails(BaseModel):
+    account_name: str = Field(min_length=1)
+    bank_name: str = Field(min_length=1)
+    account_number: str = Field(pattern=r"^[0-9]{9,18}$")
+    ifsc: str = Field(pattern=r"^[A-Z]{4}0[A-Z0-9]{6}$")
+    upi_id: str | None = None
+
+    @field_validator("ifsc", mode="before")
+    @classmethod
+    def clean_ifsc(cls, value):
+        return str(value).strip().upper()
+
+
 class InvoiceRequest(BaseModel):
     invoice_number: str = Field(min_length=1, max_length=16)
     invoice_date: date = Field(default_factory=date.today)
@@ -67,6 +81,7 @@ class InvoiceRequest(BaseModel):
     buyer: Party
     place_of_supply: str | None = Field(default=None, pattern=r"^[0-9]{2}$")
     items: list[LineItem] = Field(min_length=1)
+    bank_details: BankDetails | None = None
     notes: str | None = None
 
     @field_validator("seller")
@@ -84,6 +99,7 @@ class CalculatedItem(BaseModel):
     unit: str
     unit_price: Decimal
     gst_rate: Decimal
+    discount: Decimal
     taxable_value: Decimal
     cgst: Decimal
     sgst: Decimal
@@ -92,6 +108,7 @@ class CalculatedItem(BaseModel):
 
 
 class InvoiceTotals(BaseModel):
+    discount: Decimal
     taxable_value: Decimal
     cgst: Decimal
     sgst: Decimal
@@ -110,4 +127,5 @@ class CalculatedInvoice(BaseModel):
     tax_type: Literal["intra_state", "inter_state"]
     items: list[CalculatedItem]
     totals: InvoiceTotals
+    bank_details: BankDetails | None = None
     notes: str | None = None

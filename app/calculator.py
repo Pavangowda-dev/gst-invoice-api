@@ -28,7 +28,10 @@ def is_intra_state(invoice: InvoiceRequest):
 
 
 def calculate_item(item: LineItem, intra_state: bool):
-    taxable_value = to_paisa(item.quantity * item.unit_price)
+    gross = to_paisa(item.quantity * item.unit_price)
+    discount = to_paisa(gross * item.discount_percent / 100)
+    # GST is charged on the price after the discount
+    taxable_value = gross - discount
 
     cgst = sgst = igst = ZERO
     if intra_state:
@@ -45,6 +48,7 @@ def calculate_item(item: LineItem, intra_state: bool):
         unit=item.unit,
         unit_price=item.unit_price,
         gst_rate=item.gst_rate,
+        discount=discount,
         taxable_value=taxable_value,
         cgst=cgst,
         sgst=sgst,
@@ -57,6 +61,7 @@ def calculate_invoice(invoice: InvoiceRequest):
     intra_state = is_intra_state(invoice)
     items = [calculate_item(item, intra_state) for item in invoice.items]
 
+    discount = sum((i.discount for i in items), ZERO)
     taxable_value = sum((i.taxable_value for i in items), ZERO)
     cgst = sum((i.cgst for i in items), ZERO)
     sgst = sum((i.sgst for i in items), ZERO)
@@ -68,6 +73,7 @@ def calculate_invoice(invoice: InvoiceRequest):
     round_off = grand_total - exact_total
 
     totals = InvoiceTotals(
+        discount=discount,
         taxable_value=taxable_value,
         cgst=cgst,
         sgst=sgst,
@@ -86,5 +92,6 @@ def calculate_invoice(invoice: InvoiceRequest):
         tax_type="intra_state" if intra_state else "inter_state",
         items=items,
         totals=totals,
+        bank_details=invoice.bank_details,
         notes=invoice.notes,
     )
