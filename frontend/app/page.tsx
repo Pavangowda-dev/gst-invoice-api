@@ -239,15 +239,15 @@ export default function Home() {
   }
 
   function fillSample() {
-    setSeller({ name: "Pavan Dev Studio", gstin: "29ABCDE1234F1ZW", line1: "12 MG Road", city: "Bengaluru", stateCode: "29", pincode: "560001" });
-    setBuyer({ name: "Acme Traders", gstin: "33AAACR1234A1ZA", line1: "45 Anna Salai", city: "Chennai", stateCode: "33", pincode: "600002" });
+    setSeller({ name: "Test Seller", gstin: "29ABCDE1234F1ZW", line1: "12 MG Road", city: "Bengaluru", stateCode: "29", pincode: "560001" });
+    setBuyer({ name: "Test Buyer", gstin: "33AAACR1234A1ZA", line1: "45 Anna Salai", city: "Chennai", stateCode: "33", pincode: "600002" });
     setInvoiceNumber("INV-001");
     setNotes("Thank you for your business. Payment due within 7 days.");
     setItems([
       { description: "Website development", hsn: "998314", quantity: "1", unitPrice: "50000", gstRate: "18", discount: "10" },
       { description: "Hosting and maintenance (1 year)", hsn: "998315", quantity: "1", unitPrice: "12000", gstRate: "18", discount: "" },
     ]);
-    setBank({ accountName: "Pavan Dev Studio", bankName: "HDFC Bank", accountNumber: "50100123456789", ifsc: "HDFC0001234", upiId: "pavan@okhdfcbank" });
+    setBank({ accountName: "Test Seller", bankName: "Test Bank", accountNumber: "50100123456789", ifsc: "TEST0001234", upiId: "testseller@testbank" });
   }
 
   async function downloadPdf() {
@@ -357,7 +357,7 @@ export default function Home() {
               <TextInput label="Account holder name" value={bank.accountName} onChange={(v) => setBank({ ...bank, accountName: v })} />
               <TextInput label="Bank name" value={bank.bankName} onChange={(v) => setBank({ ...bank, bankName: v })} />
               <TextInput label="Account number" value={bank.accountNumber} maxLength={18} onChange={(v) => setBank({ ...bank, accountNumber: v.replace(/\D/g, "") })} />
-              <TextInput label="IFSC code" value={bank.ifsc} maxLength={11} placeholder="HDFC0001234" onChange={(v) => setBank({ ...bank, ifsc: v.toUpperCase() })} />
+              <TextInput label="IFSC code" value={bank.ifsc} maxLength={11} placeholder="ABCD0123456" onChange={(v) => setBank({ ...bank, ifsc: v.toUpperCase() })} />
               <div className="sm:col-span-2">
                 <TextInput label="UPI ID (optional)" value={bank.upiId} placeholder="name@bank" onChange={(v) => setBank({ ...bank, upiId: v })} />
               </div>

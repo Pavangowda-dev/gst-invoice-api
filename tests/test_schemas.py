@@ -55,17 +55,17 @@ def test_discount_over_100_percent_is_rejected():
 
 def test_bank_details_are_accepted():
     invoice = InvoiceRequest(**sample_invoice(bank_details=SAMPLE_BANK))
-    assert invoice.bank_details.ifsc == "HDFC0001234"
+    assert invoice.bank_details.ifsc == "TEST0001234"
 
 
 def test_ifsc_is_cleaned_up():
-    bank = {**SAMPLE_BANK, "ifsc": " hdfc0001234 "}
+    bank = {**SAMPLE_BANK, "ifsc": " test0001234 "}
     invoice = InvoiceRequest(**sample_invoice(bank_details=bank))
-    assert invoice.bank_details.ifsc == "HDFC0001234"
+    assert invoice.bank_details.ifsc == "TEST0001234"
 
 
 def test_bad_ifsc_is_rejected():
-    bank = {**SAMPLE_BANK, "ifsc": "HDFC1234567"}
+    bank = {**SAMPLE_BANK, "ifsc": "TEST1234567"}
     with pytest.raises(ValidationError):
         InvoiceRequest(**sample_invoice(bank_details=bank))
 

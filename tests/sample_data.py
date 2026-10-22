@@ -2,11 +2,11 @@ SAMPLE_GSTIN = "29ABCDE1234F1ZW"
 BUYER_GSTIN = "33AAACR1234A1ZA"
 
 SAMPLE_BANK = {
-    "account_name": "Pavan Dev Studio",
-    "bank_name": "HDFC Bank",
+    "account_name": "Test Seller",
+    "bank_name": "Test Bank",
     "account_number": "50100123456789",
-    "ifsc": "HDFC0001234",
-    "upi_id": "pavan@okhdfcbank",
+    "ifsc": "TEST0001234",
+    "upi_id": "testseller@testbank",
 }
 
 
@@ -32,7 +32,7 @@ def sample_invoice(
     invoice = {
         "invoice_number": "INV-001",
         "seller": {
-            "name": "Pavan Dev Studio",
+            "name": "Test Seller",
             "gstin": seller_gstin,
             "address": {
                 "line1": "12 MG Road",
@@ -42,7 +42,7 @@ def sample_invoice(
             },
         },
         "buyer": {
-            "name": "Acme Traders",
+            "name": "Test Buyer",
             "address": {
                 "line1": "45 Anna Salai",
                 "city": "Chennai",
